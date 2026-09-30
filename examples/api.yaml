@@ -1,0 +1,90 @@
+# Stateless HTTP API with runtime configuration and health checks.
+# Requires config.yaml and a populated secrets.local.yaml in the same namespace.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-api
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: example-api
+  template:
+    metadata:
+      labels:
+        app: example-api
+    spec:
+      containers:
+        - name: api
+          image: example.invalid/team/example-api:REPLACE_ME
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: APP_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: example-config
+                  key: APP_ENV
+            - name: PUBLIC_WEB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: example-config
+                  key: PUBLIC_WEB_URL
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: example-secret
+                  key: SESSION_SECRET
+            - name: UPSTREAM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: example-secret
+                  key: UPSTREAM_API_KEY
+          # Implement these endpoints or change them to match your application.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+          # Illustrative values; measure startup and steady-state usage.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-api
+spec:
+  type: ClusterIP
+  selector:
+    app: example-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

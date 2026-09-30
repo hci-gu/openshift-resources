@@ -1,0 +1,42 @@
+# Long-running worker that only makes outbound requests.
+# Requires config.yaml and a populated secrets.local.yaml; API_URL points to api.yaml.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: example-worker
+  template:
+    metadata:
+      labels:
+        app: example-worker
+    spec:
+      containers:
+        - name: worker
+          # Entrypoint runs the worker. Ensure duplicate workers are safe during
+          # rolling updates, or choose a rollout/job model that fits the work.
+          image: example.invalid/team/example-worker:REPLACE_ME
+          imagePullPolicy: Always
+          env:
+            - name: API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: example-config
+                  key: API_URL
+            - name: UPSTREAM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: example-secret
+                  key: UPSTREAM_API_KEY
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+# No Service or Route: the worker only initiates outbound requests.
+# Add a workload-specific progress/health check if the worker can stall silently.

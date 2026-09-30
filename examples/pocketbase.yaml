@@ -1,0 +1,89 @@
+# Single-instance PocketBase with persistent data and an internal Service.
+# Includes a PVC; choose its capacity and storage class for your application.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: example-pocketbase-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # Set storageClassName if the cluster default is absent or unsuitable.
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-pocketbase
+spec:
+  replicas: 1
+  # Avoid overlapping processes during upgrades of this single-instance app.
+  # Recreate entails downtime; do not scale this SQLite-backed example to >1.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: example-pocketbase
+  template:
+    metadata:
+      labels:
+        app: example-pocketbase
+    spec:
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: example-pocketbase-data
+      containers:
+        - name: pocketbase
+          # Image must serve on 0.0.0.0:8080 and write data to /pb/pb_data.
+          image: example.invalid/team/example-pocketbase:REPLACE_ME
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: data
+              mountPath: /pb/pb_data
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          # Baseline only: use an app-specific database-backed readiness check
+          # when /api/health does not establish that required data is accessible.
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-pocketbase
+spec:
+  type: ClusterIP
+  selector:
+    app: example-pocketbase
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

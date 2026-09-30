@@ -1,0 +1,19 @@
+# Optional public HTTPS access to the API Service.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: example-api
+  # Enable only if the cluster has a controller supporting this convention:
+  # annotations:
+  #   kubernetes.io/tls-acme: "true"
+spec:
+  host: example-api.example.invalid
+  to:
+    kind: Service
+    name: example-api
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None

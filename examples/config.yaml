@@ -1,0 +1,10 @@
+# Non-secret runtime configuration for the API and worker.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-config
+data:
+  APP_ENV: production
+  PUBLIC_WEB_URL: https://example-web.example.invalid
+  # Service DNS works for callers inside this namespace, not browser clients.
+  API_URL: http://example-api:8080
